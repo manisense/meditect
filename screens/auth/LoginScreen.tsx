@@ -36,8 +36,18 @@ const LoginScreen = () => {
     try {
       await signIn(email, password);
     } catch (error) {
-      Alert.alert('Login Failed', 'Please check your email and password');
-      console.error(error);
+      console.error('Login error:', error);
+      let message = 'Please check your email and password';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Email not confirmed')) {
+          message = 'Please verify your email address before signing in. Check your inbox for the verification link.';
+        } else if (error.message.includes('Invalid login credentials')) {
+          message = 'Invalid email or password. Please try again.';
+        }
+      }
+      
+      Alert.alert('Login Failed', message);
     } finally {
       setIsLoading(false);
     }

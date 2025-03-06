@@ -2,6 +2,7 @@ export interface User {
   id: string;
   email: string;
   name?: string;
+  createdAt?: string; // Made optional since it's not always available
 }
 
 export interface Medicine {
@@ -26,6 +27,7 @@ export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   ForgotPassword: undefined;
+  EmailConfirmation: undefined;
   Main: undefined;
 };
 

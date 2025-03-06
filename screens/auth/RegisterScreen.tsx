@@ -48,9 +48,26 @@ const RegisterScreen = () => {
     setIsLoading(true);
     try {
       await signUp(email, password, name);
+
+      // Always show verification message after successful signup
+      Alert.alert(
+        'Account Created',
+        'Please check your email for a verification link. You will need to verify your email before signing in.',
+        [
+          {
+            text: 'Go to Login',
+            onPress: () => navigation.navigate('Login')
+          }
+        ]
+      );
     } catch (error) {
       console.error('Registration error:', error);
-      Alert.alert('Registration Failed', 'Could not create your account. Please try again.');
+      Alert.alert(
+        'Registration Failed',
+        error instanceof Error 
+          ? error.message 
+          : 'Could not create your account. Please try again.'
+      );
     } finally {
       setIsLoading(false);
     }

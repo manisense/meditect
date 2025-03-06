@@ -48,6 +48,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadUser();
   }, [supabase]);
 
+  const createUserProfile = async (userId: string, email: string, name: string) => {
+    try {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: userId,
+            email,
+            name,
+            created_at: new Date().toISOString()
+          }
+        ]);
+
+      if (profileError) {
+        console.error('Error creating profile:', profileError);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Error in createUserProfile:', error);
+      return false;
+    }
+  };
+
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
@@ -58,17 +82,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) throw error;
 
+      if (!data.user.email_confirmed_at) {
+        throw new Error('Please verify your email address before signing in. Check your inbox for the verification link.');
+      }
+
+      // User is verified, proceed with profile creation/fetching
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', data.user.id)
         .single();
 
-      if (profileError) throw profileError;
+      let userData: User;
+
+      if (profileError || !profileData) {
+        // Profile doesn't exist, create it
+        userData = {
+          id: data.user.id,
+          email: data.user.email || '',
+          name: data.user.user_metadata?.name || data.user.email?.split('@')[0] || 'User',
+          createdAt: data.user.created_at || new Date().toISOString()
+        };
+        
+        const profileCreated = await createUserProfile(
+          userData.id,
+          userData.email,
+          userData.name
+        );
+
+        if (!profileCreated) {
+          console.warn('Failed to create profile, using basic user data');
+        }
+      } else {
+        userData = profileData;
+      }
+
+      setUser(userData);
       
-      setUser(profileData);
-      await SecureStore.setItemAsync('session', JSON.stringify(data.session));
-    } catch (error) {
+      // Store session with user data
+      await SecureStore.setItemAsync('session', JSON.stringify({
+        ...data.session,
+        user: userData
+      }));
+    } catch (error: any) {
       console.error('Error signing in:', error);
       throw error;
     } finally {
@@ -79,28 +135,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string, name: string) => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.auth.signUp({
+      
+      const { error: authError } = await supabase.auth.signUp({
         email,
-        password
+        password,
+        options: {
+          data: {
+            name // Store name in auth metadata
+          }
+        }
       });
 
-      if (error) throw error;
+      if (authError) throw authError;
 
-      if (data.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: data.user.id,
-              email,
-              name
-            }
-          ]);
+      // Don't create profile yet - wait for email verification
+      // Profile will be created on first successful login after email verification
 
-        if (profileError) throw profileError;
-
-        await signIn(email, password);
-      }
     } catch (error) {
       console.error('Error signing up:', error);
       throw error;

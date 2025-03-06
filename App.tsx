@@ -5,7 +5,7 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
-import * as SecureStore from 'expo-secure-store';
+import ExpoSecureStore from 'expo-secure-store/build/ExpoSecureStore';
 import * as tf from '@tensorflow/tfjs';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { View } from 'react-native';
@@ -47,7 +47,7 @@ export default function App() {
     // Check if user is logged in
     const checkLoginStatus = async () => {
       try {
-        const session = await SecureStore.getItemAsync('session');
+        const session = await ExpoSecureStore.getValueWithKeyAsync('session');
         setIsAuthenticated(!!session);
       } catch (error) {
         console.error('Error checking login status:', error);

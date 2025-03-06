@@ -20,10 +20,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   assetBundlePatterns: [
     "assets/**/*"
   ],
+  scheme: 'meditect',
+  plugins: [
+    'expo-camera',
+    'expo-secure-store'
+  ],
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'com.manisense.meditect',
-    jsEngine: "hermes"
+    jsEngine: "hermes",
+    associatedDomains: [`applinks:${process.env.EXPO_PUBLIC_SUPABASE_URL?.replace('https://', '')}`]
   },
   android: {
     adaptiveIcon: {
@@ -31,7 +37,21 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: '#FFFFFF'
     },
     package: 'com.manisense.meditect',
-    jsEngine: "hermes"
+    jsEngine: "hermes",
+    intentFilters: [
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        data: [
+          {
+            scheme: 'https',
+            host: process.env.EXPO_PUBLIC_SUPABASE_URL?.replace('https://', ''),
+            pathPrefix: '/auth/v1/callback'
+          }
+        ],
+        category: ['BROWSABLE', 'DEFAULT']
+      }
+    ]
   },
   web: {
     favicon: './assets/icon.png',
@@ -41,10 +61,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     themeColor: '#ffffff',
     backgroundColor: '#ffffff'
   },
-  plugins: [
-    'expo-camera',
-    'expo-secure-store'
-  ],
   experiments: {
     tsconfigPaths: true
   },
