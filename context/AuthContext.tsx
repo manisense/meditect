@@ -50,21 +50,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const createUserProfile = async (userId: string, email: string, name: string) => {
     try {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: userId,
-            email,
-            name,
-            created_at: new Date().toISOString()
-          }
-        ]);
-
-      if (profileError) {
-        console.error('Error creating profile:', profileError);
+      // First verify that the user is properly authenticated
+      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !currentUser) {
+        console.error('Auth error:', authError);
         return false;
       }
+
+      if (currentUser.id !== userId) {
+        console.error('User ID mismatch');
+        return false;
+      }
+
+      const profileData = {
+        id: userId,
+        email,
+        name,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const { data, error: insertError } = await supabase
+        .from('profiles')
+        .insert([profileData])
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Error creating profile:', insertError);
+        // If insert fails, try upsert
+        const { error: upsertError } = await supabase
+          .from('profiles')
+          .upsert([profileData], {
+            onConflict: 'id',
+            ignoreDuplicates: false
+          });
+          
+        if (upsertError) {
+          console.error('Error upserting profile:', upsertError);
+          return false;
+        }
+      }
+
       return true;
     } catch (error) {
       console.error('Error in createUserProfile:', error);
@@ -86,6 +114,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Please verify your email address before signing in. Check your inbox for the verification link.');
       }
 
+      // Wait for session to be fully established
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       // User is verified, proceed with profile creation/fetching
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -95,7 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       let userData: User;
 
-      if (profileError || !profileData) {
+      if (profileError?.code === 'PGRST116' || !profileData) {
         // Profile doesn't exist, create it
         userData = {
           id: data.user.id,
@@ -111,8 +142,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         );
 
         if (!profileCreated) {
-          console.warn('Failed to create profile, using basic user data');
+          console.error('Failed to create profile');
+          throw new Error('Failed to create user profile');
         }
+
+        // Fetch the created profile
+        const { data: newProfileData, error: newProfileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (newProfileError) {
+          console.error('Error fetching new profile:', newProfileError);
+          throw new Error('Failed to fetch user profile');
+        }
+
+        userData = newProfileData;
+      } else if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        throw new Error('Failed to fetch user profile');
       } else {
         userData = profileData;
       }
